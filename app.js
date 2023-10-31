@@ -23,29 +23,48 @@ oauth2Client.setCredentials({ refresh_token: REFRESH_TOKEN });
 // setting up connection and obtaining permission to use gmail api
 const gmail = google.gmail({ version: "v1", auth: oauth2Client });
 
-const now = new Date();
-const oneDayAgo = new Date(now);
-oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-
-const query = `newer_than:${oneDayAgo.getTime() / 1000}`;
-
 gmail.users.threads
-  .list({ userId: "me", q: "is:unread newer_than:1d" })
+  .list({ userId: "me", q: "in:inbox  newer_than:1d" })
   .then((response) => {
     console.log(response.data.threads.length);
-    const threadId = response.data.threads[0].id;
+    // const threadId = response.data.threads[0].id;
 
-    //getting the messages belongs to particular thread
-    gmail.users.threads.get({ userId: "me", id: threadId }).then((response) => {
-      const thread = response.data;
-      const messages = thread.messages;
+    const allThreads = response.data.threads;
+    allThreads.forEach(async (thread) => {
+      let response = await gmail.users.threads.get({
+        userId: "me",
+        id: thread.id,
+      });
+      const data = response.data;
+      const messages = data.messages;
+      // console.log(messages);
 
-      // checking weather the email has label 'sent'
-      console.log(messages[0].labelIds.includes("INBOX"));
+      let to_send = true;
+
+      messages.forEach((message) => {
+        if (message.labelIds.includes("SENT")) {
+          // if the message in thread contains the thread 'sent' that means i have already sent them msg so i dont know need to send them
+          // console.log(message.snippet);
+          to_send = false;
+        }
+      });
+
+      // in case if to_send remains 'true'
+      if (to_send) {
+        const headers = messages[0].payload.headers;
+        // console.log(headers);
+        const fromHeader = headers.find((header) => header.name === "From");
+        const senderEmail = fromHeader.value;
+        const sender = senderEmail.split("<")[1].split(">")[0]; // NAME <email> so we are extracting only email portion
+        console.log(sender);
+        // sendMail("Testing", "Testing 123", sender).then((response) => {
+        //   console.log(response);
+        // });
+      }
     });
   });
 
-async function sendMail() {
+async function sendMail(subject, content, to_email) {
   try {
     let accessToken = await oauth2Client.getAccessToken();
 
@@ -62,10 +81,10 @@ async function sendMail() {
     });
 
     const mailOptions = {
-      from: "SATHISH KUMAR <sthshkmr172003@gmail.com>",
-      to: process.env.MAIL_ADDR,
-      subject: "testing email ",
-      text: "this is verify your emails ",
+      from: `SATHISH KUMAR ${process.env.MAIL_ADDR}`,
+      to: to_email,
+      subject: subject,
+      text: content,
     };
 
     const result = await transport.sendMail(mailOptions);
@@ -74,9 +93,3 @@ async function sendMail() {
     console.log(error);
   }
 }
-
-// sendMail()
-//   .then((result) => {
-//     console.log(result);
-//   })
-//   .catch((err) => console.log(err));
