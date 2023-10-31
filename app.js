@@ -18,9 +18,32 @@ const oauth2Client = new google.auth.OAuth2(
   REDIRECT_URI
 );
 
-// reading unread messages
-
 oauth2Client.setCredentials({ refresh_token: REFRESH_TOKEN });
+
+// setting up connection and obtaining permission to use gmail api
+const gmail = google.gmail({ version: "v1", auth: oauth2Client });
+
+const now = new Date();
+const oneDayAgo = new Date(now);
+oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+
+const query = `newer_than:${oneDayAgo.getTime() / 1000}`;
+
+gmail.users.threads
+  .list({ userId: "me", q: "is:unread newer_than:1d" })
+  .then((response) => {
+    console.log(response.data.threads.length);
+    const threadId = response.data.threads[0].id;
+
+    //getting the messages belongs to particular thread
+    gmail.users.threads.get({ userId: "me", id: threadId }).then((response) => {
+      const thread = response.data;
+      const messages = thread.messages;
+
+      // checking weather the email has label 'sent'
+      console.log(messages[0].labelIds.includes("INBOX"));
+    });
+  });
 
 async function sendMail() {
   try {
@@ -52,8 +75,8 @@ async function sendMail() {
   }
 }
 
-sendMail()
-  .then((result) => {
-    console.log(result);
-  })
-  .catch((err) => console.log(err));
+// sendMail()
+//   .then((result) => {
+//     console.log(result);
+//   })
+//   .catch((err) => console.log(err));
