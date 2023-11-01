@@ -1,22 +1,35 @@
-require("dotenv").config();
-const nodemail = require("nodemailer");
+const oauth2Client = require("./config");
+const nodemailer = require("nodemailer");
+const { google } = require("googleapis");
 
-const transport = nodemail.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.MAIL_ADDR,
-    pass: process.env.PWD,
-  },
-});
+async function sendMail(subject, content, to_email) {
+  try {
+    let accessToken = await oauth2Client.getAccessToken(); // getting access code
 
-const mailOptions = {
-  from: process.env.MAIL_ADDR,
-  to: process.env.MAIL_ADDR,
-  subject: "I got an offer",
-  text: "checking for an email confirmation",
-};
+    const transport = nodemailer.createTransport({
+      service: "gmail", // gmail smpt server
+      auth: {
+        type: "OAUTH2", // providing authenticatin details
+        user: process.env.MAIL_ADDR,
+        clientId: process.env.CLIENT_ID,
+        clientSecret: process.env.CLIENT_SECRET,
+        refreshToken: process.env.REFRESH_TOKEN,
+        accessToken: accessToken,
+      },
+    });
 
-transport.sendMail(mailOptions, (err, info) => {
-  if (err) console.log(err);
-  else console.log(info);
-});
+    const mailOptions = {
+      from: `SATHISH KUMAR ${process.env.MAIL_ADDR}`,
+      to: to_email,
+      subject: subject,
+      text: content,
+    };
+
+    const result = await transport.sendMail(mailOptions);
+    return result;
+  } catch (error) {
+    console.log(error);
+  }
+}
+
+module.exports = sendMail;
